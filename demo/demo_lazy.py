@@ -1,3 +1,6 @@
+import sys
+sys.path.append("/kaggle/working/APE/detrex")
+
 # Copyright (c) Facebook, Inc. and its affiliates.
 import argparse
 import glob
@@ -21,6 +24,21 @@ from detectron2.evaluation.coco_evaluation import instances_to_coco_json
 # from detectron2.projects.panoptic_deeplab import add_panoptic_deeplab_config
 from detectron2.utils.logger import setup_logger
 from predictor_lazy import VisualizationDemo
+
+import torch
+from omegaconf import ListConfig
+from omegaconf.base import ContainerMetadata
+
+# Cho phép unpickle các class từ omegaconf khi load checkpoint
+torch.serialization.add_safe_globals([ListConfig, ContainerMetadata])
+
+# Nếu vẫn lỗi, ép torch.load dùng weights_only=False (chỉ khi tin tưởng checkpoint)
+orig_torch_load = torch.load
+def torch_load_patch(*args, **kwargs):
+    if "weights_only" not in kwargs:
+        kwargs["weights_only"] = False
+    return orig_torch_load(*args, **kwargs)
+torch.load = torch_load_patch
 
 # constants
 WINDOW_NAME = "APE"
