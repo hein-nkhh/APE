@@ -10,7 +10,6 @@ from collections import deque
 import cv2
 import numpy as np
 import torch
-import omegaconf
 
 from ape.engine.defaults import DefaultPredictor
 from detectron2.data import MetadataCatalog
@@ -135,45 +134,37 @@ class VisualizationDemo(object):
             parallel (bool): whether to run the model in different processes from visualization.
                 Useful since the visualization logic can be slow.
         """
-        dataset_configs = []
+        self.metadata = MetadataCatalog.get(
+            "__unused_" + "_".join([d for d in cfg.dataloader.train.dataset.names])
+        )
+        self.metadata.thing_classes = [
+            c
+            for d in cfg.dataloader.train.dataset.names
+            for c in MetadataCatalog.get(d).get("thing_classes", default=[])
+            + MetadataCatalog.get(d).get("stuff_classes", default=["thing"])[1:]
+        ]
+        self.metadata.stuff_classes = [
+            c
+            for d in cfg.dataloader.train.dataset.names
+            for c in MetadataCatalog.get(d).get("thing_classes", default=[])
+            + MetadataCatalog.get(d).get("stuff_classes", default=["thing"])[1:]
+        ]
 
-        # Xử lý dataloader.train
-        if isinstance(cfg.dataloader.train, (list, omegaconf.ListConfig)):
-            for train_cfg in cfg.dataloader.train:
-                if "dataset" in train_cfg:
-                    dataset_configs.append(train_cfg["dataset"])
-        elif "dataset" in cfg.dataloader.train:
-            dataset_configs.append(cfg.dataloader.train["dataset"])
-
-        # Thu thập tất cả tên dataset
-        names_list = []
-        for dataset_cfg in dataset_configs:
-            if isinstance(dataset_cfg, (omegaconf.DictConfig, dict)):
-                dataset_cfg = omegaconf.OmegaConf.to_container(dataset_cfg)
-                if "names" in dataset_cfg:
-                    names = dataset_cfg["names"]
-                    if isinstance(names, list):
-                        names_list.extend(names)
-                    else:
-                        names_list.append(names)
-                elif "name" in dataset_cfg:
-                    names_list.append(dataset_cfg["name"])
-            elif isinstance(dataset_cfg, str):
-                names_list.append(dataset_cfg)
-
-        # Tạo metadata
-        train_set_name = "__unused_" + "_".join(names_list)
-        self.metadata = MetadataCatalog.get(train_set_name)
-
-        # Ghép tất cả thing_classes & stuff_classes
-        thing_classes = []
-        stuff_classes = []
-        for d in names_list:
-            thing_classes.extend(MetadataCatalog.get(d).get("thing_classes", []))
-            stuff_classes.extend(MetadataCatalog.get(d).get("stuff_classes", []))
-
-        self.metadata.thing_classes = thing_classes
-        self.metadata.stuff_classes = stuff_classes
+        # self.metadata = MetadataCatalog.get(
+        #     "__unused_ape_" + "_".join([d for d in cfg.dataloader.train.dataset.names])
+        # )
+        # self.metadata.thing_classes = [
+        #     c
+        #     for d in ["coco_2017_train_panoptic_separated"]
+        #     for c in MetadataCatalog.get(d).get("thing_classes", default=[])
+        #     + MetadataCatalog.get(d).get("stuff_classes", default=["thing"])[1:]
+        # ]
+        # self.metadata.stuff_classes = [
+        #     c
+        #     for d in ["coco_2017_train_panoptic_separated"]
+        #     for c in MetadataCatalog.get(d).get("thing_classes", default=[])
+        #     + MetadataCatalog.get(d).get("stuff_classes", default=["thing"])[1:]
+        # ]
 
         self.cpu_device = torch.device("cpu")
         self.instance_mode = instance_mode
